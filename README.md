@@ -25,6 +25,7 @@ mqtt:
     
   switch:
   - name: "Spa Pump"
+    icon: "mdi:pump"
     state_topic: "homeassistant/spa/state"
     value_template: "{{ value_json.pump }}"
     state_on: true
@@ -37,7 +38,7 @@ mqtt:
   - name: "Spa Temperature"
     device_class: "temperature"
     command_topic: "homeassistant/spa/set"
-    command_template: '{"tempSP": {{value}} }'
+    command_template: '{"temperature": {{value}} }'
     min: 32
     max: 105
     state_topic: "homeassistant/spa/state"

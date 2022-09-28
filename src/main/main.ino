@@ -5,7 +5,7 @@
 #include <Arduino_JSON.h>
 #include "secrets.h"
 
-#define DEBUG
+//#define DEBUG
 
 // Use #define in secrets.h for your specific settings
 // e.g. #define S_SSID "Your WiFi SSID"
@@ -30,6 +30,7 @@ long timeBetweenMessages = 1000 * 20 * 1;
 bool pumpStatus;
 bool heaterStatus;
 int tempF;
+int tempLast;
 int tempSP;
 bool updateRecv = false;
 int status = WL_IDLE_STATUS;     // the starting Wifi radio's status
@@ -88,9 +89,9 @@ void callback(char* topic, byte* payload, unsigned int length)
     Serial.println(pumpStatus);
 	#endif
   }
-  if(inMessage.hasOwnProperty("tempSP"))
+  if(inMessage.hasOwnProperty("temperature"))
   {
-    tempSP = (int) inMessage["tempSP"];
+    tempSP = (int) inMessage["temperature"];
 	updateRecv = true;
 	#ifdef DEBUG
     Serial.print("Temp set to: ");
@@ -110,14 +111,6 @@ void reconnect()
     // Attempt to connect
     if (client.connect(clientId,mqttUser,mqttPass))
     {
-/* 	  char *configTopics[] = 
-	  {		
-		"ha/spa/temp/state",
-		"ha/spa/temp/set",
-		"ha/spa/pump/state",
-		"ha/spa/pump/set",
-		"ha/spa/heater/state"
-	  } */
 	  
 	  client.publish("homeassistant/spa", ("connected"), true);
 	  client.subscribe("homeassistant/spa/set");
@@ -167,6 +160,7 @@ void loop()
 
   //check the temp
   sensors.requestTemperatures();
+  tempLast = tempF;
   tempF = sensors.getTempFByIndex(0);
   
   digitalWrite(PUMP_PIN, pumpStatus);//May have to change polarity depending on SSR
@@ -181,16 +175,16 @@ void loop()
     }
     else
     {
-      digitalWrite(HEATER_PIN, false);
+      digitalWrite(HEATER_PIN, false);//May have to change polarity depending on SSR
       outMessage["heater"] = false;
     }
   }
   outMessage["temperature"] = tempF;
 
-  //Serialize and broadcast on a timer or if a command was received
+  //Serialize and broadcast on a timer or if a command was received or if the temp changes
 
   now = millis();
-  if(now - lastMsg > timeBetweenMessages || updateRecv)
+  if(now - lastMsg > timeBetweenMessages || updateRecv || (tempF != tempLast))
   {
     lastMsg = now;
     #ifdef DEBUG
