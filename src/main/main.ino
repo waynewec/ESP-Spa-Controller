@@ -31,6 +31,7 @@ bool pumpStatus;
 bool heaterStatus;
 int tempF;
 int tempSP;
+bool updateRecv = false;
 int status = WL_IDLE_STATUS;     // the starting Wifi radio's status
 
 
@@ -81,14 +82,20 @@ void callback(char* topic, byte* payload, unsigned int length)
   if(inMessage.hasOwnProperty("pump"))//Make sure that "pump" is part of the message
   {
     pumpStatus = (bool) inMessage["pump"];
-    //Serial.print("Pump set to: ");
-    //Serial.println(pumpStatus);
+	updateRecv = true;
+	#ifdef DEBUG
+    Serial.print("Pump set to: ");
+    Serial.println(pumpStatus);
+	#endif
   }
   if(inMessage.hasOwnProperty("tempSP"))
   {
     tempSP = (int) inMessage["tempSP"];
-    //Serial.print("Temp set to: ");
-    //Serial.println(tempSP);
+	updateRecv = true;
+	#ifdef DEBUG
+    Serial.print("Temp set to: ");
+    Serial.println(tempSP);
+	#endif
   }
 }
 void reconnect()
@@ -112,21 +119,12 @@ void reconnect()
 		"ha/spa/heater/state"
 	  } */
 	  
-	  client.publish("ha/spa", ("connected"), true);
-	  client.subscribe("ha/spa/temp/set");
-	  client.subscribe("ha/spa/pump/set");
-
-      //Serial.println("connected");
-      // Once connected, publish an announcement...
-      // client.publish(topic, ("connected") , true );
-      // ... and resubscribe
-      // String subscription = String(topic);
-      // subscription += "/";
-      // subscription += clientId;
-      // subscription += "/in";
-      // client.subscribe(subscription.c_str());
-      //Serial.print("subscribed to : ");
-      //Serial.println(subscription);
+	  client.publish("homeassistant/spa", ("connected"), true);
+	  client.subscribe("homeassistant/spa/set");
+	  #ifdef DEBUG
+      Serial.println("connected");
+	  #endif
+	  
     } else {
 	  #ifdef DEBUG
       Serial.print("failed, rc=");
@@ -170,22 +168,21 @@ void loop()
   //check the temp
   sensors.requestTemperatures();
   tempF = sensors.getTempFByIndex(0);
-  //outMessage["value"]=tempF;
   
   digitalWrite(PUMP_PIN, pumpStatus);//May have to change polarity depending on SSR
-  //outMessage["pump"] = pumpStatus;
-  //outMessage["heater"] = false;
+  outMessage["pump"] = pumpStatus;
+  outMessage["heater"] = false;
   if(pumpStatus)
   {
     if(tempF<tempSP)
     {
       digitalWrite(HEATER_PIN, true);//May have to change polarity depending on SSR
-      //outMessage["heater"] = true;
+      outMessage["heater"] = true;
     }
     else
     {
       digitalWrite(HEATER_PIN, false);
-      //outMessage["heater"] = false;
+      outMessage["heater"] = false;
     }
   }
   outMessage["temperature"] = tempF;
@@ -193,7 +190,7 @@ void loop()
   //Serialize and broadcast on a timer
 
   now = millis();
-  if(now - lastMsg > timeBetweenMessages)
+  if(now - lastMsg > timeBetweenMessages || updateRecv)
   {
     lastMsg = now;
     String pubTopic;
@@ -210,5 +207,6 @@ void loop()
     //client.publish((char *) pubTopic.c_str(), JSON.stringify(outMessage).c_str());
 	
 	client.publish("homeassistant/spa/state", JSON.stringify(outMessage).c_str());
+	updateRecv = false;
   }
 }
