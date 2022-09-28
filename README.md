@@ -14,3 +14,33 @@ This particular implementation uses a Wemos D1 Mini clone with built in ESP8266 
 - [OneWire](https://www.pjrc.com/teensy/td_libs_OneWire.html)
 - [DallasTemperature](https://github.com/milesburton/Arduino-Temperature-Control-Library)
 - [Arduino_JSON](https://github.com/arduino-libraries/Arduino_JSON)
+
+## Home Assistant Configuration
+```
+mqtt:
+  sensor:
+  - name: "Spa Heater"
+    state_topic: "homeassistant/spa/state"
+    value_template: "{{ value_json.heater }}"
+    
+  switch:
+  - name: "Spa Pump"
+    state_topic: "homeassistant/spa/state"
+    value_template: "{{ value_json.pump }}"
+    state_on: true
+    state_off: false
+    command_topic: "homeassistant/spa/set"
+    payload_on: '{"pump":true}'
+    payload_off: '{"pump":false}'
+    
+  number:
+  - name: "Spa Temperature"
+    device_class: "temperature"
+    command_topic: "homeassistant/spa/set"
+    command_template: '{"tempSP": {{value}} }'
+    min: 32
+    max: 105
+    state_topic: "homeassistant/spa/state"
+    value_template: "{{ value_json.temperature }}"
+    unit_of_measurement: "°F"
+```

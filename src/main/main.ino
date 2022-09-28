@@ -187,24 +187,16 @@ void loop()
   }
   outMessage["temperature"] = tempF;
 
-  //Serialize and broadcast on a timer
+  //Serialize and broadcast on a timer or if a command was received
 
   now = millis();
   if(now - lastMsg > timeBetweenMessages || updateRecv)
   {
     lastMsg = now;
-    String pubTopic;
-    pubTopic += topic ;
-    pubTopic += "/";
-    pubTopic += clientId;
-    pubTopic += "/out";
     #ifdef DEBUG
-    //Serial.print("Publish topic: ");
-    //Serial.println(pubTopic);
-    //Serial.print("Publish message: ");
-    //Serial.println(outMessage);
+    Serial.print("Publish message: ");
+    Serial.println(outMessage);
 	#endif
-    //client.publish((char *) pubTopic.c_str(), JSON.stringify(outMessage).c_str());
 	
 	client.publish("homeassistant/spa/state", JSON.stringify(outMessage).c_str());
 	updateRecv = false;
