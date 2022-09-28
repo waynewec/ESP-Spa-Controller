@@ -15,7 +15,7 @@ const char* mqtt_server = S_MQTT_SERVER;
 const char* mqttUser = S_MQTT_USER;
 const char* mqttPass = S_MQTT_PASS;
 
-const char* topic = "spa";//"wemos";    // this is the [root topic]
+const char* topic = "spa";
 const char* clientId = "controller";
 
 long timeBetweenMessages = 1000 * 20 * 1;
