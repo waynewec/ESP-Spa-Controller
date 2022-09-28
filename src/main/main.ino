@@ -7,7 +7,7 @@
 
 #define DEBUG
 
-// Update these with values suitable for your network.
+// Use #define in secrets.h for your specific settings
 
 const char* ssid = S_SSID;
 const char* pswd = S_PSWD;
