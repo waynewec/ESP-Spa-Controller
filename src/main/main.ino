@@ -8,6 +8,7 @@
 #define DEBUG
 
 // Use #define in secrets.h for your specific settings
+// e.g. #define S_SSID "Your WiFi SSID"
 
 const char* ssid = S_SSID;
 const char* pswd = S_PSWD;
@@ -102,35 +103,28 @@ void reconnect()
     // Attempt to connect
     if (client.connect(clientId,mqttUser,mqttPass))
     {
+/* 	  char *configTopics[] = 
+	  {		
+		"ha/spa/temp/state",
+		"ha/spa/temp/set",
+		"ha/spa/pump/state",
+		"ha/spa/pump/set",
+		"ha/spa/heater/state"
+	  } */
 	  
-	  const char* configTopic = "homeassistant/sensor/spaTemp/config";
-	  char *configTopics = 
-	  {
-		"homeassistant/sensor/spaTemp/config",
-		"homeassistant/switch/spaPump/config",
-		"homeassistant/sensor/spaHeater/config"
-		"homeassistant/
-	  }
-	  
-	  
-	  
-	  
-	  
-	  
-	  
-	  
-	  
-	  
-	  
+	  client.publish("ha/spa", ("connected"), true);
+	  client.subscribe("ha/spa/temp/set");
+	  client.subscribe("ha/spa/pump/set");
+
       //Serial.println("connected");
       // Once connected, publish an announcement...
-      client.publish(topic, ("connected") , true );
+      // client.publish(topic, ("connected") , true );
       // ... and resubscribe
-      String subscription = String(topic);
-      subscription += "/";
-      subscription += clientId;
-      subscription += "/in";
-      client.subscribe(subscription.c_str());
+      // String subscription = String(topic);
+      // subscription += "/";
+      // subscription += clientId;
+      // subscription += "/in";
+      // client.subscribe(subscription.c_str());
       //Serial.print("subscribed to : ");
       //Serial.println(subscription);
     } else {
@@ -147,12 +141,6 @@ void reconnect()
   }
 }
 
-publishDiscovery()
-{
-  
-}
-
-
 
 void setup()
 {
@@ -166,8 +154,6 @@ void setup()
 
   //Initialize the temp sensor
   sensors.begin();
-
-  publishDiscovery();
 }
 
 JSONVar outMessage;
@@ -184,24 +170,25 @@ void loop()
   //check the temp
   sensors.requestTemperatures();
   tempF = sensors.getTempFByIndex(0);
+  //outMessage["value"]=tempF;
   
   digitalWrite(PUMP_PIN, pumpStatus);//May have to change polarity depending on SSR
-  outMessage["pump"] = pumpStatus;
-  outMessage["heater"] = false;
+  //outMessage["pump"] = pumpStatus;
+  //outMessage["heater"] = false;
   if(pumpStatus)
   {
     if(tempF<tempSP)
     {
       digitalWrite(HEATER_PIN, true);//May have to change polarity depending on SSR
-      outMessage["heater"] = true;
+      //outMessage["heater"] = true;
     }
     else
     {
       digitalWrite(HEATER_PIN, false);
-      outMessage["heater"] = false;
+      //outMessage["heater"] = false;
     }
   }
-  outMessage["tempAct"] = tempF;
+  outMessage["temperature"] = tempF;
 
   //Serialize and broadcast on a timer
 
@@ -214,11 +201,14 @@ void loop()
     pubTopic += "/";
     pubTopic += clientId;
     pubTopic += "/out";
-    #ifdef
+    #ifdef DEBUG
     //Serial.print("Publish topic: ");
     //Serial.println(pubTopic);
     //Serial.print("Publish message: ");
     //Serial.println(outMessage);
-    client.publish((char *) pubTopic.c_str(), JSON.stringify(outMessage).c_str());
+	#endif
+    //client.publish((char *) pubTopic.c_str(), JSON.stringify(outMessage).c_str());
+	
+	client.publish("homeassistant/spa/state", JSON.stringify(outMessage).c_str());
   }
 }
