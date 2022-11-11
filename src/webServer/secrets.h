@@ -1,0 +1,5 @@
+#define S_SSID "Loch Ness Monster"
+#define S_PSWD "Gimme Tree Fiddy"
+#define S_MQTT_SERVER "192.168.0.11"
+#define S_MQTT_USER "MQTT"
+#define S_MQTT_PASS "timeToMQTT"

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hot Tub Interface</title>
+    <meta name="viewport"content="width=device-width,initial-scale=1">
+    <style>
+        html {
+            font-family:Arial;
+            display:inline-block;
+            margin:0px auto;
+            text-align:center;
+        }
+        h1 {
+            color:#0F3376;
+            padding:2vh;
+            font-variant:small-caps;
+        }
+        p {
+            font-size: 1.5rem;
+        }
+        .btn {
+            display:inline-block;
+            background-color:#df8918;
+            border:none;
+            border-radius:4px;
+            color:white;
+            padding:16px 40px;
+            text-decoration:none;
+            font-size:30px;
+            margin:2px;
+            cursor:pointer;
+        }
+        .btnA {
+            background-color:#1cd4f5;
+        }
+        .btnO{
+            background-color: #d61e06;
+        }
+        .btnI{
+            background-color: #078832;
+        }
+        .btnD{
+            background-color:#99500b;
+        }
+        .units {
+            font-size:1.2rem;
+            vertical-align:middle
+        }
+        .sensor-labels {
+            font-size:1.5rem;
+            vertical-align:middle;
+            padding-bottom:15px;
+        }
+    </style>
+    
+</head>
+<body>
+    <h1>Hot Tub Controller</h1>
+    <p>
+        <a href="/on"><button class="btn">ON</button></a>
+        <a href="/auto"><button class="btn btnA">AUTO</button></a>
+        <a href="/off"><button class="btn btnO">OFF</button></a>
+    </p>
+    <p>
+        <a href="/inc"><button class="btn btnI">+</button></a>
+        <a href="/dec"><button class="btn btnD">-</button></a>
+    </p>
+    <p>
+        <span class="sensor-labels">Current Temp: </span>
+        <span class="sensor-labels" id="tempMeas">%TEMPMEAS%</span>
+        <sup class="units">°F</sup>
+    </p>
+    <p>
+        <span class="sensor-labels">Temp Setpoint: </span>
+        <span class="sensor-labels" id = "tempSP">%TEMPSP%</span>
+        <sup class="units">°F</sup>
+    </p>
+    
+</body>
+<script>
+    function request(elementId)
+    {
+        var xhttp=new XMLHttpRequest();
+        xhttp.onreadystatechange=function(){
+        if (this.readyState==4&&this.status==200){
+            document.getElementById(elementId).innerHTML=this.responseText;
+        }
+        };
+        xhttp.open("GET","/"+elementId,true);
+        xhttp.send();
+    }
+    window.onload = function() {
+        request("tempMeas");
+        request("tempSP");
+    }
+    setInterval(request("tempMeas"),250);
+    setInterval(request("tempSP"),250);
+</script>
+</html>

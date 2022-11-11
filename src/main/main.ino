@@ -1,11 +1,12 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#include <ArduinoOTA.h>
 #include <OneWire.h>
 #include "DallasTemperature.h"
 #include <Arduino_JSON.h>
 #include "secrets.h"
 
-#define DEBUG
+//#define DEBUG
 
 // Use #define in secrets.h for your specific settings
 // e.g. #define S_SSID "Your WiFi SSID"
@@ -21,15 +22,20 @@ const char* clientId = "controller";
 
 long timeBetweenMessages = 1000 * 20 * 1;
 
+float hysteresis 0.2;
+
 //Pin config
-#define ONE_WIRE_BUS 2
-#define PUMP_PIN 0
-#define HEATER_PIN 4
+#define ONE_WIRE_BUS D4
+#define PUMP_PIN D2
+#define HEATER_PIN D1
 
 //System wide states
 bool pumpStatus;
 bool heaterStatus;
-int tempF;
+float tempFloat;
+
+//int tempF;
+//int tempLast;
 int tempSP;
 bool updateRecv = false;
 int status = WL_IDLE_STATUS;     // the starting Wifi radio's status
@@ -40,6 +46,13 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+float round_to_dp( float in_value, int decimal_place )
+{
+  float multiplier = powf( 10.0f, decimal_place );
+  in_value = roundf( in_value * multiplier ) / multiplier;
+  return in_value;
+}
 
 void setup_wifi()
 {
@@ -60,6 +73,49 @@ void setup_wifi()
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
   #endif
+}
+void setup_ota()
+{
+  ArduinoOTA.onStart([]() {
+    String type;
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      type = "sketch";
+    } else { // U_FS
+      type = "filesystem";
+    }
+
+    // NOTE: if updating FS this would be the place to unmount FS using FS.end()
+    #ifdef DEBUG
+    Serial.println("Start updating " + type);
+    #endif
+  });
+  ArduinoOTA.onEnd([]() {
+    #ifdef DEBUG
+    Serial.println("\nEnd");
+    #endif
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    #ifdef DEBUG
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    #endif
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    #ifdef DEBUG
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) {
+      Serial.println("Auth Failed");
+    } else if (error == OTA_BEGIN_ERROR) {
+      Serial.println("Begin Failed");
+    } else if (error == OTA_CONNECT_ERROR) {
+      Serial.println("Connect Failed");
+    } else if (error == OTA_RECEIVE_ERROR) {
+      Serial.println("Receive Failed");
+    } else if (error == OTA_END_ERROR) {
+      Serial.println("End Failed");
+    }
+    #endif
+  });
+  ArduinoOTA.begin();
 }
 
 void callback(char* topic, byte* payload, unsigned int length)
@@ -88,14 +144,22 @@ void callback(char* topic, byte* payload, unsigned int length)
     Serial.println(pumpStatus);
 	#endif
   }
+  // if(inMessage.hasOwnProperty("temperature"))
+  // {
+  //   tempSP = (int) inMessage["temperature"];
+	// updateRecv = true;
+	// #ifdef DEBUG
+  //   Serial.print("Temp set to: ");
+  //   Serial.println(tempSP);
+	// #endif
+  // }
   if(inMessage.hasOwnProperty("tempSP"))
   {
     tempSP = (int) inMessage["tempSP"];
-	updateRecv = true;
-	#ifdef DEBUG
-    Serial.print("Temp set to: ");
-    Serial.println(tempSP);
-	#endif
+    updateRecv = true;
+    #ifdef DEBUG
+    Serial.print("Temp set to:");
+    Serial.println(tempSP)
   }
 }
 void reconnect()
@@ -110,14 +174,6 @@ void reconnect()
     // Attempt to connect
     if (client.connect(clientId,mqttUser,mqttPass))
     {
-/* 	  char *configTopics[] = 
-	  {		
-		"ha/spa/temp/state",
-		"ha/spa/temp/set",
-		"ha/spa/pump/state",
-		"ha/spa/pump/set",
-		"ha/spa/heater/state"
-	  } */
 	  
 	  client.publish("homeassistant/spa", ("connected"), true);
 	  client.subscribe("homeassistant/spa/set");
@@ -143,10 +199,19 @@ void reconnect()
 void setup()
 {
   pinMode(BUILTIN_LED, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
+  pinMode(PUMP_PIN, OUTPUT);
+  digitalWrite(PUMP_PIN, LOW);
+  pinMode(HEATER_PIN, OUTPUT);
+  digitalWrite(HEATER_PIN, LOW);
+
+  tempSP = 40;
+  pumpStatus = false;
+  
   #ifdef DEBUG
   Serial.begin(115200);
   #endif
   setup_wifi();
+  setup_ota();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
@@ -164,41 +229,49 @@ void loop()
     reconnect();//Reconnect if not
   }
   client.loop();//Allow the MQTT API to run it's backend shit
+  ArduinoOTA.handle();//Listen  for OTA updates
 
   //check the temp
   sensors.requestTemperatures();
-  tempF = sensors.getTempFByIndex(0);
+  tempFloat = sensors.getTempFByIndex(0);
+  //tempF = (int) tempFloat;
   
   digitalWrite(PUMP_PIN, pumpStatus);//May have to change polarity depending on SSR
   outMessage["pump"] = pumpStatus;
   outMessage["heater"] = false;
   if(pumpStatus)
   {
-    if(tempF<tempSP)
+    if(tempFloat<tempSP-hysteresis)
     {
-      digitalWrite(HEATER_PIN, true);//May have to change polarity depending on SSR
+      digitalWrite(HEATER_PIN, true);
       outMessage["heater"] = true;
     }
-    else
+    else if(tempFloat>tempSP+hysteresis)
     {
       digitalWrite(HEATER_PIN, false);
       outMessage["heater"] = false;
     }
   }
-  outMessage["temperature"] = tempF;
+  else
+  {
+    digitalWrite(HEATER_PIN, false);
+    outMessage["heater"] = false;
+  }
+  outMessage["temperature"] = tempFloat;
+  outMessage["tempSP"] = tempSP;
 
   //Serialize and broadcast on a timer or if a command was received
 
   now = millis();
-  if(now - lastMsg > timeBetweenMessages || updateRecv)
+  if( ((now - lastMsg) > timeBetweenMessages) || updateRecv)
   {
     lastMsg = now;
     #ifdef DEBUG
     Serial.print("Publish message: ");
     Serial.println(outMessage);
-	#endif
+	  #endif
 	
-	client.publish("homeassistant/spa/state", JSON.stringify(outMessage).c_str());
-	updateRecv = false;
+	  lient.publish("homeassistant/spa/state", JSON.stringify(outMessage).c_str());
+	  updateRecv = false;
   }
 }
