@@ -24,9 +24,9 @@ const char* domainName = "hottub";
 ESP8266WebServer server(80);
 
 //Pin config
-#define ONE_WIRE_BUS 2
-#define PUMP_PIN 0
-#define HEATER_PIN 4
+#define ONE_WIRE_BUS D4
+#define PUMP_PIN D2
+#define HEATER_PIN D1
 
 //System wide states
 int status = WL_IDLE_STATUS;     // the starting Wifi radio's status
@@ -102,9 +102,7 @@ void spaControlLoop()
     #ifdef DEBUG
     Serial.println("Mode set to ON");
     #endif
-    //turn on pump
     digitalWrite(PUMP_PIN, true);
-    //turn on heater if needed
     if(tempMeas<tempSP)
     {
       #ifdef DEBUG
@@ -124,9 +122,7 @@ void spaControlLoop()
     #ifdef DEBUG
     Serial.println("Mode set to OFF");
     #endif
-    //turn off pump
     digitalWrite(PUMP_PIN, false);
-    //turn off heater
     digitalWrite(HEATER_PIN, false);
     break;
   default:
@@ -206,13 +202,13 @@ padding-bottom:15px;\
 </p>\
 <p>\
 <span class=\"sensor-labels\">Current Temp: </span>\
-<span class=\"sensor-labels\" id=\"tempMeas\">%TEMPMEAS%</span>\
-<sup class=\"units\">°F</sup>\
+<span class=\"sensor-labels\" id=\"tempMeas\">XX</span>\
+<sup class=\"units\">\xB0""F</sup>\
 </p>\
 <p>\
 <span class=\"sensor-labels\">Temp Setpoint: </span>\
-<span class=\"sensor-labels\" id = \"tempSP\">%TEMPSP%</span>\
-<sup class=\"units\">°F</sup>\
+<span class=\"sensor-labels\" id = \"tempSP\">XX</span>\
+<sup class=\"units\">\xB0""F</sup>\
 </p>\
 </body>\
 <script>\
@@ -313,18 +309,35 @@ void http_init()
 void setup()
 {
   pinMode(BUILTIN_LED, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
+  digitalWrite(BUILTIN_LED, LOW);
+  pinMode(PUMP_PIN, OUTPUT);
+  digitalWrite(PUMP_PIN, LOW);
+  pinMode(HEATER_PIN, OUTPUT);
+  digitalWrite(HEATER_PIN, LOW);
   #ifdef DEBUG
   Serial.begin(115200); 
   #endif  
   setup_wifi();
   http_init();
 
+  state = OFF;
+  tempSP = 40;
+
   //Initialize the temp sensor
   sensors.begin();
 }
 
+long now, last;
+//bool toggle = false;
 void loop()
 {
-  spaControlLoop();
+  //toggle = !toggle;
+  //digitalWrite(BUILTIN_LED, !digitalRead(BUILTIN_LED));
+  now = millis();
+  if(now - last > 5000)
+  {
+    last = now;
+    spaControlLoop();
+  }
   server.handleClient();
 }
