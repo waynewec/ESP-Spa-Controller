@@ -22,7 +22,7 @@ const char* clientId = "controller";
 
 long timeBetweenMessages = 1000 * 20 * 1;
 
-float hysteresis 0.2;
+float hysteresis = 0.2;
 
 //Pin config
 #define ONE_WIRE_BUS D4
@@ -32,6 +32,7 @@ float hysteresis 0.2;
 //System wide states
 bool pumpStatus;
 bool heaterStatus;
+bool statusChange;
 float tempFloat;
 
 //int tempF;
@@ -160,6 +161,7 @@ void callback(char* topic, byte* payload, unsigned int length)
     #ifdef DEBUG
     Serial.print("Temp set to:");
     Serial.println(tempSP)
+    #endif
   }
 }
 void reconnect()
@@ -206,6 +208,8 @@ void setup()
 
   tempSP = 40;
   pumpStatus = false;
+  heaterStatus = false;
+  statusChange = false;
   
   #ifdef DEBUG
   Serial.begin(115200);
@@ -232,6 +236,7 @@ void loop()
   ArduinoOTA.handle();//Listen  for OTA updates
 
   //check the temp
+  // Need to wait for temp to be stable before trusting the temp reading
   sensors.requestTemperatures();
   tempFloat = sensors.getTempFByIndex(0);
   //tempF = (int) tempFloat;
@@ -245,17 +250,32 @@ void loop()
     {
       digitalWrite(HEATER_PIN, true);
       outMessage["heater"] = true;
+      if(heaterStatus == false)
+        statusChange = true;
+      else
+        statusChange = false;
+      heaterStatus = true;
     }
     else if(tempFloat>tempSP+hysteresis)
     {
       digitalWrite(HEATER_PIN, false);
       outMessage["heater"] = false;
+      if(heaterStatus == true)
+        statusChange = true;
+      else
+        statusChange = false;
+      heaterStatus = false;
     }
   }
   else
   {
     digitalWrite(HEATER_PIN, false);
     outMessage["heater"] = false;
+    if(heaterStatus == true)
+      statusChange = true;
+    else
+      statusChange = false;
+    heaterStatus = false;
   }
   outMessage["temperature"] = tempFloat;
   outMessage["tempSP"] = tempSP;
@@ -263,7 +283,7 @@ void loop()
   //Serialize and broadcast on a timer or if a command was received
 
   now = millis();
-  if( ((now - lastMsg) > timeBetweenMessages) || updateRecv)
+  if( ((now - lastMsg) > timeBetweenMessages) || updateRecv || statusChange)
   {
     lastMsg = now;
     #ifdef DEBUG
@@ -271,7 +291,7 @@ void loop()
     Serial.println(outMessage);
 	  #endif
 	
-	  lient.publish("homeassistant/spa/state", JSON.stringify(outMessage).c_str());
+	  client.publish("homeassistant/spa/state", JSON.stringify(outMessage).c_str());
 	  updateRecv = false;
   }
 }
